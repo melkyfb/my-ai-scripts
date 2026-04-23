@@ -23,6 +23,24 @@ python pdf-from-images.py <path> <reps> [-o output.pdf]
   - `2,3` + 4 images → cyclic pattern applied across images (user prompted to confirm)
 - Always shows a preview and asks for confirmation before writing; user can change reps or output path interactively.
 
+### `transcribe.py`
+Requires: `pip install openai-whisper` + system `ffmpeg`
+Optional API mode: `pip install openai`
+
+```
+python transcribe.py <file> [--srt] [--lang pt] [--model medium] [-o output]
+python transcribe.py <file> --api [--api-key sk-...]   # uses OpenAI Whisper API
+```
+
+- Supports: mp3, mp4, mov, ogg, wav, m4a, webm, mkv
+- Cleans audio before transcribing: noise reduction (`afftdn`) + loudness normalization (`loudnorm`) via ffmpeg
+- Always outputs a `.txt` file with the full transcription
+- `--srt` generates a `.srt` subtitle file with timestamps
+- `--lang` forces a language; omit for auto-detection
+- `--model` selects Whisper model size: tiny/base/small/medium/large (default: medium)
+- `--no-clean` skips the ffmpeg preprocessing step
+- `--api` / `--api-key` uses OpenAI's hosted Whisper API instead of local model; key also read from `OPENAI_API_KEY` env var
+
 ## Planned scripts
 
 - **Image generation** — generate images from a terminal prompt (via API, e.g. OpenAI/Stability)
