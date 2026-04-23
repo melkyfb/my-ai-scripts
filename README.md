@@ -39,8 +39,11 @@ Always shows a preview and asks for confirmation before writing. The output path
 
 Transcribe audio or video files to text, with optional SRT subtitle output.
 
-**Requires:** `pip install openai-whisper` + system `ffmpeg` (`apt install ffmpeg` / `brew install ffmpeg`)  
-**API mode only:** `pip install openai`
+**Requires:**
+```bash
+pip install openai openai-whisper
+sudo apt install ffmpeg
+```
 
 ```bash
 python transcribe.py <file> [options]
