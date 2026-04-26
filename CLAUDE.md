@@ -73,7 +73,9 @@ python split-audio.py <file> [options]
 
 ## Conventions
 
+- **All scripts must be written in Python** — no shell scripts or other languages
 - Each script is self-contained and runnable from the terminal
 - Scripts that require API keys or external dependencies document them at the top of the file
-- Python scripts use `argparse`; shell scripts use positional args + `getopts`
-- Name scripts descriptively: `pdf-from-images.py`, `site-scraper.py`, `git-wrap.sh`
+- Python scripts use `argparse`
+- Name scripts descriptively: `pdf-from-images.py`, `site-scraper.py`, `git-wrap.py`
+- All pip dependencies must be listed in `requirements.txt`

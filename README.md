@@ -1,5 +1,17 @@
 # scripts
 
+## Setup
+
+```bash
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+> System dependencies (`ffmpeg`, `ffprobe`) must be installed separately — see each script's section below.
+
+---
+
 Collection of small, focused utility scripts. Each one solves a single task and runs directly from the terminal.
 
 ---
