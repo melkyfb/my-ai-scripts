@@ -64,6 +64,22 @@ python split-audio.py <file> [options]
 - Always previews segments and confirms before writing; last segment is always the remainder
 - Rejects `--interval` ≥ audio duration
 
+### `download.py`
+Requires: `pip install yt-dlp` + system `ffmpeg`
+
+```
+python download.py <url> [-o output_dir]
+```
+
+- Supports: YouTube, Instagram, TikTok, Facebook, Vimeo, Twitter/X, Twitch, Reddit, SoundCloud, Dailymotion, Rumble, and hundreds more via yt-dlp
+- Analyzes the URL first (no download) to detect available formats and content type
+- Interactive menu adapts to content: audio-focused sites (SoundCloud, YouTube Music) show audio options first
+- Playlist support: detects playlists and offers bulk download
+- Image support: detects photo posts (Instagram) and offers image download
+- Video quality menu: shows all available resolutions with codec, container and estimated size
+- Audio options: MP3 192/320kbps, M4A, Opus, WAV, or keep original codec
+- Progress bar with speed and ETA during download
+
 ## Planned scripts
 
 - **Image generation** — generate images from a terminal prompt (via API, e.g. OpenAI/Stability)

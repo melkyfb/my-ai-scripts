@@ -157,6 +157,56 @@ Always shows a preview of all segments with start/end times and asks for confirm
 
 ---
 
+### `download.py`
+
+Download videos, audio, or images from YouTube, Instagram, TikTok, Facebook, Vimeo and hundreds of other sites.
+
+**Requires:**
+```bash
+pip install yt-dlp
+sudo apt install ffmpeg
+```
+
+```bash
+python download.py <url> [-o DIR]
+```
+
+| Argument | Description |
+|---|---|
+| `url` | URL to download from |
+| `-o, --output` | Output directory (default: current directory) |
+
+**What it does:**
+
+1. Analyzes the URL without downloading — detects title, duration, available formats, and content type
+2. Presents a smart interactive menu based on what's available:
+   - Audio-focused sites (SoundCloud, YouTube Music) show audio options first
+   - Instagram photo posts offer image download
+   - Playlists are detected automatically with bulk download options
+3. For video: choose quality (resolution + codec + estimated size shown) and audio format
+4. For audio only: MP3 192/320kbps, M4A, Opus, WAV, or keep original codec
+5. Shows a live progress bar with speed and ETA
+
+**Supported sites:** YouTube, Instagram, TikTok, Facebook, Vimeo, Twitter/X, Twitch, Reddit, SoundCloud, Dailymotion, Rumble, Odysee, Bilibili, and [hundreds more](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md).
+
+**Examples:**
+
+```bash
+# Download a YouTube video (interactive menu)
+python download.py https://youtube.com/watch?v=...
+
+# Download to a specific folder
+python download.py https://www.tiktok.com/@user/video/... -o ~/Downloads
+
+# Download audio from SoundCloud (audio menu shown first)
+python download.py https://soundcloud.com/artist/track
+
+# Download an Instagram photo post
+python download.py https://www.instagram.com/p/...
+```
+
+---
+
 ## Planned
 
 - **Image generation** — generate images from a terminal prompt via API (OpenAI/Stability)
