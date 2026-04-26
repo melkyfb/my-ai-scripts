@@ -44,6 +44,49 @@ def fmt(seconds):
     return f"{h:02d}:{m:02d}:{s:06.3f}"
 
 
+def fmt_time_label(seconds):
+    """Format seconds as HHhMMmSSs for use in filenames (e.g. 01h30m00s)."""
+    h = int(seconds // 3600)
+    m = int((seconds % 3600) // 60)
+    s = int(seconds % 60)
+    return f"{h:02d}h{m:02d}m{s:02d}s"
+
+
+def make_filename(stem, suffix, i, total, start, end, name_fmt):
+    pad = len(str(total))
+    if name_fmt == "time":
+        return f"{stem}_{fmt_time_label(start)}-{fmt_time_label(end)}{suffix}"
+    if name_fmt == "part":
+        return f"{stem}_part_{i:0{pad}d}_of_{total}{suffix}"
+    if name_fmt == "chapter":
+        return f"{stem}_chapter_{i:0{pad}d}{suffix}"
+    return f"{stem}_{i:0{pad}d}{suffix}"  # index (default)
+
+
+# ─── Title helpers ────────────────────────────────────────────────────────────
+
+def sanitize_filename(name):
+    name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", name)
+    name = re.sub(r"\s+", " ", name).strip()
+    return name or "untitled"
+
+
+def fetch_video_title(url):
+    try:
+        import yt_dlp
+    except ImportError:
+        print("yt-dlp is required for --url. Install with: pip install yt-dlp", file=sys.stderr)
+        sys.exit(1)
+    print(f"Fetching title from {url} …")
+    with yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True}) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+        except yt_dlp.utils.DownloadError as e:
+            print(f"Error fetching URL: {e}", file=sys.stderr)
+            sys.exit(1)
+    return sanitize_filename(info.get("title") or "untitled")
+
+
 # ─── System checks ────────────────────────────────────────────────────────────
 
 def require_cmd(name):
@@ -231,15 +274,22 @@ def build_time_boundaries(file_path, duration, args):
 
 # ─── Preview + confirm ────────────────────────────────────────────────────────
 
-def preview(boundaries):
-    w = 62
-    print(f"\n{'─' * w}")
-    print(f"  {'#':>4}  {'Start':>11}  {'End':>11}  {'Duration':>11}")
-    print(f"{'─' * w}")
-    for i, (s, e) in enumerate(zip(boundaries[:-1], boundaries[1:]), 1):
-        print(f"  {i:>4}  {fmt(s):>11}  {fmt(e):>11}  {fmt(e - s):>11}")
-    print(f"{'─' * w}")
-    print(f"  Total: {len(boundaries) - 1} segment(s)\n")
+def preview(boundaries, stem, suffix, name_fmt):
+    total = len(boundaries) - 1
+    pad = len(str(total))
+    names = [
+        make_filename(stem, suffix, i, total, s, e, name_fmt)
+        for i, (s, e) in enumerate(zip(boundaries[:-1], boundaries[1:]), 1)
+    ]
+    nc = max(max(len(n) for n in names), 8)  # min width = len("Filename")
+    sep = "─" * (2 + pad + 2 + 12 + 2 + 12 + 2 + 12 + 2 + nc)
+    print(f"\n{sep}")
+    print(f"  {'#':>{pad}}  {'Start':>12}  {'End':>12}  {'Duration':>12}  {'Filename':<{nc}}")
+    print(sep)
+    for i, ((s, e), name) in enumerate(zip(zip(boundaries[:-1], boundaries[1:]), names), 1):
+        print(f"  {i:>{pad}}  {fmt(s):>12}  {fmt(e):>12}  {fmt(e - s):>12}  {name}")
+    print(sep)
+    print(f"  Total: {total} segment(s)\n")
 
 
 def confirm(prompt="Proceed with splitting? [y/n]: "):
@@ -253,7 +303,7 @@ def confirm(prompt="Proceed with splitting? [y/n]: "):
 
 # ─── Splitting ────────────────────────────────────────────────────────────────
 
-def split_file(file_path, boundaries, output_dir, stem):
+def split_file(file_path, boundaries, output_dir, stem, name_fmt):
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     suffix = Path(file_path).suffix
@@ -262,7 +312,8 @@ def split_file(file_path, boundaries, output_dir, stem):
     print(f"Writing {total} file(s) to {output_dir}/\n")
 
     for i, (start, end) in enumerate(zip(boundaries[:-1], boundaries[1:]), 1):
-        out = output_dir / f"{stem}_{i:03d}{suffix}"
+        filename = make_filename(stem, suffix, i, total, start, end, name_fmt)
+        out = output_dir / filename
         cmd = [
             "ffmpeg", "-y",
             "-ss", str(start),
@@ -298,16 +349,23 @@ split-at options (for --mode time):
   sentence   Cut at the nearest sentence end — requires Whisper
   paragraph  Cut at the nearest paragraph end — requires Whisper
 
+filename patterns (--name):
+  index      podcast_001.mp3, podcast_002.mp3  (default)
+  time       podcast_00h00m00s-00h30m00s.mp3
+  part       podcast_part_01_of_05.mp3
+  chapter    podcast_chapter_01.mp3
+
 examples:
   python split-audio.py podcast.mp3 --mode time --interval 30:00
   python split-audio.py lecture.mp3 --mode time --interval 1:00:00 --split-at sentence
   python split-audio.py audiobook.mp3 --mode chapters --chapter-silence 2.0
   python split-audio.py interview.mp4 --mode time --interval 45:00 --split-at exact -o ./parts
+  python split-audio.py file.mp3 --mode time --interval 30:00 --title "Meu Podcast" --name part
+  python split-audio.py file.mp3 --mode chapters --url https://youtube.com/watch?v=... --name chapter
 """,
     )
 
     parser.add_argument("file", help="Input audio or video file")
-
     parser.add_argument(
         "--mode", choices=["chapters", "time"], default="time",
         help="Split strategy (default: time)",
@@ -356,8 +414,21 @@ examples:
         help="Output directory (default: same folder as input file)",
     )
     g_shared.add_argument(
+        "--title", metavar="NAME",
+        help="Custom base name for output files (e.g. 'My Podcast')",
+    )
+    g_shared.add_argument(
+        "--url", metavar="URL",
+        help="Fetch the base name from a video URL (YouTube, TikTok, etc.) via yt-dlp",
+    )
+    g_shared.add_argument(
         "--prefix", metavar="NAME",
-        help="Output filename prefix (default: input filename without extension)",
+        help="Alias for --title (kept for compatibility)",
+    )
+    g_shared.add_argument(
+        "--name", choices=["index", "time", "part", "chapter"], default="index",
+        metavar="PATTERN",
+        help="Filename pattern: index (001), time (01h00m00s-01h30m00s), part (part_01_of_N), chapter (chapter_01) (default: index)",
     )
     g_shared.add_argument(
         "-y", "--yes", action="store_true",
@@ -375,9 +446,17 @@ examples:
         sys.exit(1)
 
     output_dir = Path(args.output) if args.output else file_path.parent
-    stem = args.prefix or file_path.stem
+
+    # Stem priority: --title > --url > --prefix > filename stem
+    if args.title:
+        stem = sanitize_filename(args.title)
+    elif args.url:
+        stem = fetch_video_title(args.url)
+    else:
+        stem = args.prefix or file_path.stem
 
     print(f"Input   : {file_path}")
+    print(f"Stem    : {stem}")
     duration = get_duration(file_path)
     print(f"Duration: {fmt(duration)}")
 
@@ -389,13 +468,13 @@ examples:
             sys.exit(1)
         boundaries = build_time_boundaries(file_path, duration, args)
 
-    preview(boundaries)
+    preview(boundaries, stem, file_path.suffix, args.name)
 
     if not args.yes and not confirm():
         print("Cancelled.")
         sys.exit(0)
 
-    split_file(file_path, boundaries, output_dir, stem)
+    split_file(file_path, boundaries, output_dir, stem, args.name)
 
 
 if __name__ == "__main__":
