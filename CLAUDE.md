@@ -41,6 +41,29 @@ python transcribe.py <file> --api [--api-key sk-...]   # uses OpenAI Whisper API
 - `--no-clean` skips the ffmpeg preprocessing step
 - `--api` / `--api-key` uses OpenAI's hosted Whisper API instead of local model; key also read from `OPENAI_API_KEY` env var
 
+### `split-audio.py`
+Requires: `ffmpeg` + `ffprobe` (system)
+Optional for sentence/paragraph modes: `pip install openai-whisper`
+
+```
+python split-audio.py <file> [options]
+```
+
+- `--mode chapters` — detect chapter breaks via long silences; no Whisper needed
+- `--mode time --interval TIME` — split at fixed intervals (HH:MM:SS / MM:SS / seconds)
+- `--split-at silence|exact|sentence|paragraph` — where to cut near each interval boundary
+  - `silence` (default): nearest silence within `--window` seconds
+  - `exact`: precise time, no adjustment
+  - `sentence` / `paragraph`: nearest Whisper-detected sentence or paragraph end
+- `--window SECS` — search window around target times (default: 30)
+- `--chapter-silence SECS` — min silence for chapter detection (default: 1.5)
+- `--noise-db DB` — noise threshold in dB for silence detection (default: -35)
+- `--whisper-model SIZE` — Whisper model size (default: base)
+- `-o DIR` — output directory (default: same folder as input)
+- `-y` — skip confirmation
+- Always previews segments and confirms before writing; last segment is always the remainder
+- Rejects `--interval` ≥ audio duration
+
 ## Planned scripts
 
 - **Image generation** — generate images from a terminal prompt (via API, e.g. OpenAI/Stability)

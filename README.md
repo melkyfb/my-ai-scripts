@@ -83,6 +83,68 @@ The script cleans the audio before transcribing: converts to 16kHz mono, applies
 
 ---
 
+### `split-audio.py`
+
+Split large audio or video files by auto-detected chapters or fixed time intervals, cutting at natural boundaries.
+
+**Requires:** `ffmpeg` + `ffprobe` (system)
+**Optional:** `pip install openai-whisper` (for `--split-at sentence/paragraph`)
+
+```bash
+python split-audio.py <file> [options]
+```
+
+**Modes:**
+
+| `--mode` | Description |
+|---|---|
+| `time` (default) | Split at a fixed interval; `--split-at` controls where exactly to cut |
+| `chapters` | Auto-detect chapter breaks using silence gaps (no Whisper needed) |
+
+**`--split-at` options (for `--mode time`):**
+
+| Value | Description |
+|---|---|
+| `silence` (default) | Cut at the nearest silence within the search window |
+| `exact` | Cut at the precise interval time |
+| `sentence` | Cut at the nearest sentence end — requires Whisper |
+| `paragraph` | Cut at the nearest paragraph end — requires Whisper |
+
+**Key options:**
+
+| Flag | Description |
+|---|---|
+| `--interval TIME` | Split interval: `HH:MM:SS`, `MM:SS`, or seconds (e.g. `30:00`, `3600`) |
+| `--window SECS` | Search window around each target time in seconds (default: 30) |
+| `--chapter-silence SECS` | Min silence duration to detect as chapter boundary (default: 1.5s) |
+| `--min-chapter SECS` | Min chapter duration in seconds (default: 60) |
+| `--noise-db DB` | Noise threshold for silence detection in dB (default: -35) |
+| `--whisper-model SIZE` | Whisper model: `tiny` / `base` / `small` / `medium` / `large` (default: base) |
+| `--lang CODE` | Language hint for Whisper (e.g. `pt`, `en`) |
+| `-o DIR` | Output directory (default: same folder as input) |
+| `--prefix NAME` | Output filename prefix (default: input filename stem) |
+| `-y` | Skip confirmation prompt |
+
+**Examples:**
+
+```bash
+# Split every 30 min, cutting at the nearest silence
+python split-audio.py podcast.mp3 --mode time --interval 30:00
+
+# Split every hour at the nearest sentence end
+python split-audio.py lecture.mp3 --mode time --interval 1:00:00 --split-at sentence --lang pt
+
+# Auto-detect chapters from an audiobook
+python split-audio.py audiobook.mp3 --mode chapters --chapter-silence 2.0
+
+# Split exactly every 45 minutes into a specific folder
+python split-audio.py interview.mp4 --mode time --interval 45:00 --split-at exact -o ./parts
+```
+
+Always shows a preview of all segments with start/end times and asks for confirmation before writing. The last segment always contains the remaining audio. Interval cannot exceed the total audio duration.
+
+---
+
 ## Planned
 
 - **Image generation** — generate images from a terminal prompt via API (OpenAI/Stability)
