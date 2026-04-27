@@ -244,6 +244,49 @@ python download.py https://www.instagram.com/p/...
 
 ---
 
+### `claude-local.py`
+
+Launch Claude Code backed by a local [Ollama](https://ollama.com) model instead of Anthropic's API.
+
+Starts a [litellm](https://github.com/BerriAI/litellm) proxy that translates Claude's Anthropic Messages API calls into Ollama requests, then runs the `claude` CLI against it. When you exit Claude Code the proxy shuts down automatically.
+
+**Requires:**
+```bash
+pip install 'litellm[proxy]'
+ollama serve                  # Ollama must be running
+ollama pull deepseek-v3       # or whichever model you want
+```
+
+```bash
+python claude-local.py [-m MODEL] [-c TOKENS] [--port PORT]
+```
+
+| Flag | Description |
+|---|---|
+| `-m, --model NAME` | Ollama model to use (default: `deepseek-v3`) |
+| `-c, --context TOKENS` | Context window size in tokens (default: `64000`) |
+| `--port PORT` | Port for the litellm proxy (default: `4001`) |
+
+**Examples:**
+
+```bash
+# Start with defaults (deepseek-v3, 64k context)
+python claude-local.py
+
+# Use a different model
+python claude-local.py -m llama3.2
+
+# Override model and context
+python claude-local.py -m qwen2.5-coder:14b -c 32000
+
+# Use a different proxy port (e.g. if 4001 is taken)
+python claude-local.py -m mistral --port 4002
+```
+
+The proxy maps the user-specified Ollama model to all Claude model aliases that Claude Code might send internally, so routing works regardless of Claude Code's configured default model.
+
+---
+
 ## Planned
 
 - **Image generation** — generate images from a terminal prompt via API (OpenAI/Stability)

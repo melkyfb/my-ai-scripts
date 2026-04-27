@@ -80,6 +80,22 @@ python download.py <url> [-o output_dir]
 - Audio options: MP3 192/320kbps, M4A, Opus, WAV, or keep original codec
 - Progress bar with speed and ETA during download
 
+### `claude-local.py`
+Requires: `pip install 'litellm[proxy]'` + Ollama running locally
+
+```
+python claude-local.py [-m MODEL] [-c TOKENS] [--port PORT]
+```
+
+- `-m` / `--model` — Ollama model to use (default: `deepseek-v3`)
+- `-c` / `--context` — context window in tokens (default: 64000)
+- `--port` — litellm proxy port (default: 4001)
+- Checks that Ollama is running and the model is pulled before starting
+- Starts a litellm proxy that translates Anthropic Messages API ↔ Ollama
+- All Claude model aliases are mapped to the chosen Ollama model so routing
+  works regardless of which default model Claude Code is configured to use
+- Proxy shuts down automatically when Claude Code exits
+
 ## Planned scripts
 
 - **Image generation** — generate images from a terminal prompt (via API, e.g. OpenAI/Stability)
