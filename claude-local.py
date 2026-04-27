@@ -33,14 +33,15 @@ OLLAMA_BASE     = "http://localhost:11434"
 # Claude model names that Claude Code may send in requests; all get routed to
 # the configured Ollama model so Claude Code works regardless of its default.
 _CLAUDE_ALIASES = [
+    "claude-3-7-sonnet-20250219",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
     "claude-opus-4-7",
     "claude-opus-4-5",
     "claude-sonnet-4-6",
     "claude-sonnet-4-5",
     "claude-haiku-4-5-20251001",
     "claude-haiku-4-5",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
 ]
 
 
@@ -167,7 +168,15 @@ examples:
         "--port", type=int, default=PROXY_PORT, metavar="PORT",
         help=f"litellm proxy port (default: {PROXY_PORT})",
     )
+    parser.add_argument(
+        "claude_args", nargs=argparse.REMAINDER,
+        help="Additional arguments to pass directly to Claude Code",
+    )
     args = parser.parse_args()
+
+    # Se o primeiro argumento extra for "--", removemos para limpar o comando repassado
+    if args.claude_args and args.claude_args[0] == "--":
+        args.claude_args = args.claude_args[1:]
 
     litellm_bin = check_litellm()
     check_ollama(args.model)
@@ -199,7 +208,8 @@ examples:
 
     exit_code = 0
     try:
-        result = subprocess.run(["claude"], env=env)
+        cmd = ["claude"] + args.claude_args
+        result = subprocess.run(cmd, env=env)
         exit_code = result.returncode
     except FileNotFoundError:
         print(

@@ -258,7 +258,7 @@ ollama pull deepseek-v3       # or whichever model you want
 ```
 
 ```bash
-python claude-local.py [-m MODEL] [-c TOKENS] [--port PORT]
+python claude-local.py [-m MODEL] [-c TOKENS] [--port PORT] [-- claude_args...]
 ```
 
 | Flag | Description |
@@ -266,6 +266,7 @@ python claude-local.py [-m MODEL] [-c TOKENS] [--port PORT]
 | `-m, --model NAME` | Ollama model to use (default: `deepseek-v3`) |
 | `-c, --context TOKENS` | Context window size in tokens (default: `64000`) |
 | `--port PORT` | Port for the litellm proxy (default: `4001`) |
+| `claude_args` | Any extra arguments will be passed directly to Claude Code |
 
 **Examples:**
 
@@ -281,6 +282,9 @@ python claude-local.py -m qwen2.5-coder:14b -c 32000
 
 # Use a different proxy port (e.g. if 4001 is taken)
 python claude-local.py -m mistral --port 4002
+
+# Pass arguments directly to Claude Code (use -- to separate them)
+python claude-local.py -m llama3.2 -- --help
 ```
 
 The proxy maps the user-specified Ollama model to all Claude model aliases that Claude Code might send internally, so routing works regardless of Claude Code's configured default model.
