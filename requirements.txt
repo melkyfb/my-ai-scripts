@@ -3,3 +3,4 @@ openai-whisper
 openai
 anthropic
 yt-dlp
+litellm[proxy]
