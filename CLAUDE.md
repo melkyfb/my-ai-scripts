@@ -80,6 +80,29 @@ python download.py <url> [-o output_dir]
 - Audio options: MP3 192/320kbps, M4A, Opus, WAV, or keep original codec
 - Progress bar with speed and ETA during download
 
+### `comptia-download.py`
+Requires: `pip install playwright yt-dlp` + `playwright install chromium`
+
+```
+python comptia-download.py <course_url> -u EMAIL [-p PASSWORD] [-o DIR]
+```
+
+- `course_url` — URL of the course on certmaster.comptia.org
+- `-u` / `--user` — login email
+- `-p` / `--password` — password (prompted securely if omitted)
+- `-o` — output directory (default: `comptia-course`)
+- `--headless` — run without showing the browser window
+- `--delay` — seconds between page loads (default: 2.0)
+- `--skip-confirm` — skip the outline preview before downloading
+- Logs in, navigates to the Outline tab, and discovers all numbered modules (1.0, 1.1, 1.1.1…)
+- Shows a preview of all items and asks for confirmation before downloading
+- Saves each module as a PDF in a mirrored directory hierarchy:
+  `"1.0 Chapter"/"1.1 Section"/"1.1.1 Topic.pdf"`
+- Detects embedded videos (HTML5, YouTube, Vimeo, Kaltura, Brightcove) and downloads via yt-dlp;
+  video files use the same name as the PDF but with the video extension
+- Skips already-downloaded files; safe to re-run after interruption
+- Defaults to visible browser (no `--headless`) to allow manual SSO/2FA handling
+
 ### `claude-local.py`
 Requires: `pip install 'litellm[proxy]'` + Ollama running locally
 
