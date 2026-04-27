@@ -9,6 +9,8 @@ System:   ffmpeg (for audio conversion and video merging)
 import argparse
 import os
 import sys
+import threading
+import time
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -152,8 +154,8 @@ def has_images(info: dict) -> bool:
 
 # ── progress ──────────────────────────────────────────────────────────────────
 
-def make_progress_hook():
-    state = {"last_pct": -1}
+def make_progress_hook(shared: dict):
+    state = {"last_pct": -1, "stream": 0}
 
     def hook(d):
         if d["status"] == "downloading":
@@ -171,10 +173,42 @@ def make_progress_hook():
             bar = "█" * filled + "░" * (30 - filled)
             speed_str = (fmt_size(speed) + "/s") if speed else "?/s"
             eta_str = fmt_dur(eta) if eta else "?"
-            print(f"\r  [{bar}] {pct:>5.1f}%  {speed_str:>10}  ETA {eta_str:>7}", end="", flush=True)
+            # stream counter is incremented on finished, so during download of
+            # stream N the counter is N-1; show label starting from stream 2
+            label = f"  [{state['stream'] + 1}] " if state["stream"] >= 1 else "  "
+            print(f"\r{label}[{bar}] {pct:>5.1f}%  {speed_str:>10}  ETA {eta_str:>7}", end="", flush=True)
 
         elif d["status"] == "finished":
+            state["stream"] += 1
+            state["last_pct"] = -1
+            shared["last_finished"] = time.monotonic()
             print()
+
+    return hook
+
+
+def make_postprocessor_hook(shared: dict):
+    state = {"active": False}
+
+    def hook(d):
+        pp     = d.get("postprocessor", "")
+        status = d.get("status", "")
+        if status == "started":
+            if "Merger" in pp:
+                shared["pp_shown"] = True
+                print("  Merging streams...", end="", flush=True)
+                state["active"] = True
+            elif "ExtractAudio" in pp or "AudioConvert" in pp:
+                shared["pp_shown"] = True
+                print("  Converting audio...", end="", flush=True)
+                state["active"] = True
+            elif "Concat" in pp:
+                shared["pp_shown"] = True
+                print("  Concatenating...", end="", flush=True)
+                state["active"] = True
+        elif status == "finished" and state["active"]:
+            print(" done.")
+            state["active"] = False
 
     return hook
 
@@ -182,17 +216,42 @@ def make_progress_hook():
 # ── download ──────────────────────────────────────────────────────────────────
 
 def base_opts(output_dir: str) -> dict:
+    shared = {"last_finished": None, "pp_shown": False}
     return {
-        "outtmpl":        str(Path(output_dir) / "%(title)s.%(ext)s"),
-        "quiet":          True,
-        "no_warnings":    True,
-        "progress_hooks": [make_progress_hook()],
+        "outtmpl":             str(Path(output_dir) / "%(title)s.%(ext)s"),
+        "quiet":               True,
+        "no_warnings":         True,
+        "progress_hooks":      [make_progress_hook(shared)],
+        "postprocessor_hooks": [make_postprocessor_hook(shared)],
+        "__shared":            shared,
     }
 
 
 def do_download(url: str, opts: dict):
-    with yt_dlp.YoutubeDL(opts) as ydl:
-        ydl.download([url])
+    shared = opts.pop("__shared", {})
+    done   = threading.Event()
+
+    def _monitor():
+        # After the last download stream finishes, if no postprocessor message
+        # has appeared within 2 s, print a generic fallback so the user knows
+        # something is still happening (covers old yt-dlp versions and gaps
+        # between download completion and ffmpeg start).
+        while not done.is_set():
+            lf = shared.get("last_finished")
+            if lf and time.monotonic() - lf > 2.0 and not shared.get("pp_shown"):
+                print("  Processing, please wait...", flush=True)
+                shared["pp_shown"] = True
+                break
+            done.wait(0.3)
+
+    t = threading.Thread(target=_monitor, daemon=True)
+    t.start()
+    try:
+        with yt_dlp.YoutubeDL(opts) as ydl:
+            ydl.download([url])
+    finally:
+        done.set()
+        t.join(timeout=2)
 
 
 # ── menus ─────────────────────────────────────────────────────────────────────

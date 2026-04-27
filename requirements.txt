@@ -1,4 +1,5 @@
 Pillow
 openai-whisper
 openai
+anthropic
 yt-dlp

@@ -97,10 +97,11 @@ The script cleans the audio before transcribing: converts to 16kHz mono, applies
 
 ### `split-audio.py`
 
-Split large audio or video files by auto-detected chapters or fixed time intervals, cutting at natural boundaries.
+Split large audio or video files into chapters or timed intervals, cutting at natural boundaries.
 
 **Requires:** `ffmpeg` + `ffprobe` (system)
-**Optional:** `pip install openai-whisper` (for `--split-at sentence/paragraph`)
+**Optional:** `pip install openai-whisper` (for `--split-at sentence/paragraph` and `--mode transcript`)
+**Optional:** `pip install anthropic` or `pip install openai` (for `--mode transcript`)
 
 ```bash
 python split-audio.py <file> [options]
@@ -111,7 +112,31 @@ python split-audio.py <file> [options]
 | `--mode` | Description |
 |---|---|
 | `time` (default) | Split at a fixed interval; `--split-at` controls where exactly to cut |
-| `chapters` | Auto-detect chapter breaks using silence gaps (no Whisper needed) |
+| `chapters` | Smart chapter detection: reads embedded metadata first, then adaptive silence analysis |
+| `transcript` | Full Whisper transcription + AI identifies spoken chapter/section titles |
+
+#### `--mode chapters`
+
+Discovers the structure of the file automatically, in order:
+
+1. **Embedded metadata** — reads chapter markers directly from the file (common in `.m4b` and `.m4a` audiobooks). Uses titles for filenames when present.
+2. **Adaptive silence analysis** — if no metadata is found, scans the entire file and groups silences by duration to find structural levels (e.g. chapter-level breaks vs. section-level breaks). Presents an interactive menu so you can choose the desired granularity.
+
+#### `--mode transcript`
+
+1. Transcribes the full file with Whisper (local model, no API needed for transcription)
+2. Sends the timestamped transcript to an AI (Anthropic Claude or OpenAI GPT)
+3. AI identifies every line where the narrator announces a chapter, part, or section title
+4. Cuts exactly at those timestamps and names the files after the detected titles
+5. Falls back to `--mode chapters` automatically if no titles are found
+
+**AI configuration (required for `--mode transcript`):**
+
+| Method | How |
+|---|---|
+| Anthropic (default) | `export ANTHROPIC_API_KEY=sk-ant-...` |
+| OpenAI | `export OPENAI_API_KEY=sk-...` |
+| Explicit | `--api-key KEY --ai-provider anthropic\|openai` |
 
 **`--split-at` options (for `--mode time`):**
 
@@ -126,15 +151,18 @@ python split-audio.py <file> [options]
 
 | Flag | Description |
 |---|---|
-| `--interval TIME` | Split interval: `HH:MM:SS`, `MM:SS`, or seconds (e.g. `30:00`, `3600`) |
+| `--interval TIME` | Split interval: `HH:MM:SS`, `MM:SS`, or seconds — required for `--mode time` |
 | `--window SECS` | Search window around each target time in seconds (default: 30) |
-| `--chapter-silence SECS` | Min silence duration to detect as chapter boundary (default: 1.5s) |
-| `--min-chapter SECS` | Min chapter duration in seconds (default: 60) |
+| `--min-chapter SECS` | Min segment duration in seconds (default: 60) |
 | `--noise-db DB` | Noise threshold for silence detection in dB (default: -35) |
 | `--whisper-model SIZE` | Whisper model: `tiny` / `base` / `small` / `medium` / `large` (default: base) |
 | `--lang CODE` | Language hint for Whisper (e.g. `pt`, `en`) |
+| `--ai-provider PROVIDER` | AI provider for `--mode transcript`: `anthropic` or `openai` |
+| `--api-key KEY` | API key (or set `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` env var) |
+| `--ai-model MODEL` | Override AI model (default: `claude-haiku-4-5-20251001` / `gpt-4o-mini`) |
+| `--name PATTERN` | Filename pattern: `index` (default), `time`, `part`, `chapter` |
+| `--title NAME` | Custom base name for output files |
 | `-o DIR` | Output directory (default: same folder as input) |
-| `--prefix NAME` | Output filename prefix (default: input filename stem) |
 | `-y` | Skip confirmation prompt |
 
 **Examples:**
@@ -143,17 +171,26 @@ python split-audio.py <file> [options]
 # Split every 30 min, cutting at the nearest silence
 python split-audio.py podcast.mp3 --mode time --interval 30:00
 
-# Split every hour at the nearest sentence end
+# Split every hour at the nearest sentence end (Portuguese)
 python split-audio.py lecture.mp3 --mode time --interval 1:00:00 --split-at sentence --lang pt
 
-# Auto-detect chapters from an audiobook
-python split-audio.py audiobook.mp3 --mode chapters --chapter-silence 2.0
+# Auto-detect chapters from an audiobook (reads embedded metadata if available)
+python split-audio.py audiobook.m4b --mode chapters
+
+# Auto-detect chapters from an MP3 (adaptive silence analysis, choose level interactively)
+python split-audio.py audiobook.mp3 --mode chapters --lang pt
+
+# AI-powered chapter detection via Whisper + Claude
+ANTHROPIC_API_KEY=sk-ant-... python split-audio.py audiobook.mp3 --mode transcript --lang pt
+
+# AI-powered chapter detection via Whisper + GPT
+OPENAI_API_KEY=sk-... python split-audio.py audiobook.mp3 --mode transcript --ai-provider openai
 
 # Split exactly every 45 minutes into a specific folder
 python split-audio.py interview.mp4 --mode time --interval 45:00 --split-at exact -o ./parts
 ```
 
-Always shows a preview of all segments with start/end times and asks for confirmation before writing. The last segment always contains the remaining audio. Interval cannot exceed the total audio duration.
+Always shows a preview of all segments with filenames and asks for confirmation before writing. The last segment always contains the remaining audio.
 
 ---
 
