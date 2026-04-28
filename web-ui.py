@@ -69,14 +69,42 @@ HTML_TEMPLATE = """
         label { display: block; margin-bottom: 5px; font-weight: bold; color: #333; }
         .help-text { font-size: 0.85em; color: #666; margin-bottom: 8px; display: block; }
         input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        .input-group { display: flex; gap: 10px; }
         input[type="checkbox"] { transform: scale(1.2); margin-right: 10px; }
         button { background: #28a745; color: white; border: none; padding: 10px 20px; font-size: 16px; border-radius: 4px; cursor: pointer; font-weight: bold; }
         button:hover { background: #218838; }
+        button.btn-secondary { background: #6c757d; }
+        button.btn-secondary:hover { background: #5a6268; }
         pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; white-space: pre-wrap; }
-        .help-block { background: #e9ecef; color: #333; padding: 15px; border-radius: 4px; font-size: 0.9em; }
+        .help-block { background: #e9ecef; color: #333; padding: 15px; border-radius: 4px; font-size: 0.9em; margin-bottom: 20px; }
+        .title-container { display: flex; align-items: center; gap: 15px; }
+        .help-icon { background: #007bff; color: white; border-radius: 50%; width: 30px; height: 30px; display: flex; justify-content: center; align-items: center; font-size: 18px; cursor: pointer; font-weight: bold; }
+        .help-icon:hover { background: #0056b3; }
+        
+        #fs-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        #fs-content { background: white; padding: 20px; border-radius: 8px; width: 600px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; }
+        #fs-list { flex: 1; overflow-y: auto; border: 1px solid #ccc; margin: 15px 0; padding: 10px; border-radius: 4px; }
+        .fs-item { padding: 8px; cursor: pointer; border-bottom: 1px solid #eee; display: flex; align-items: center; gap: 10px; }
+        .fs-item:hover { background: #f0f0f0; }
+        .fs-dir { font-weight: bold; color: #007bff; }
     </style>
 </head>
 <body>
+
+    <div id="fs-modal" class="hidden">
+        <div id="fs-content">
+            <h3>Selecionar Arquivo / Diretório</h3>
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="fs-current-path" readonly style="background:#eee;">
+                <button type="button" class="btn-secondary" onclick="fsGoUp()">Subir</button>
+            </div>
+            <div id="fs-list"></div>
+            <div style="display:flex; justify-content: space-between;">
+                <button type="button" class="btn-secondary" onclick="closeFsModal()">Cancelar</button>
+                <button type="button" onclick="fsSelectCurrent()">Selecionar Pasta Atual</button>
+            </div>
+        </div>
+    </div>
 
     <div id="sidebar">
         <h2>Meus Scripts</h2>
@@ -86,13 +114,13 @@ HTML_TEMPLATE = """
     </div>
 
     <div id="content">
-        <h1 id="script-title">Selecione um script</h1>
+        <div class="title-container">
+            <h1 id="script-title">Selecione um script</h1>
+            <div id="help-btn" class="help-icon hidden" onclick="toggleHelp()" title="Ver Ajuda">?</div>
+        </div>
         
         <div id="script-ui" class="hidden">
-            <div class="form-group">
-                <label>Ajuda / Uso do Script:</label>
-                <pre class="help-block" id="script-help">Carregando...</pre>
-            </div>
+            <pre class="help-block hidden" id="script-help">Carregando...</pre>
 
             <div id="dynamic-form"></div>
 
@@ -107,6 +135,12 @@ HTML_TEMPLATE = """
 
     <script>
         let currentScript = "";
+        let fsTargetInput = null;
+        let fsCurrentPath = "";
+
+        function toggleHelp() {
+            document.getElementById('script-help').classList.toggle('hidden');
+        }
 
         async function selectScript(script) {
             currentScript = script;
@@ -114,7 +148,9 @@ HTML_TEMPLATE = """
             document.getElementById('tab-' + script.replace('.', '-')).classList.add('active');
             
             document.getElementById('script-title').innerText = script;
+            document.getElementById('help-btn').classList.remove('hidden');
             document.getElementById('script-ui').classList.remove('hidden');
+            document.getElementById('script-help').classList.add('hidden');
             document.getElementById('script-help').innerText = "Carregando opções...";
             document.getElementById('script-output').innerText = "Aguardando execução...";
             document.getElementById('dynamic-form').innerHTML = "";
@@ -140,12 +176,65 @@ HTML_TEMPLATE = """
                     arg.choices.forEach(c => { html += `<option value="${c}">${c}</option>`; });
                     html += `</select>`;
                 } else {
-                    const placeholder = (arg.name === 'file' || arg.name === 'path') ? 'Caminho absoluto do arquivo...' : 'Valor...';
-                    html += `<input type="text" id="${id}" placeholder="${placeholder}" data-flag="${arg.flags[0] || ''}" data-is-pos="${arg.flags.length === 0}">`;
+                    const isFileOrDir = ['file', 'path', 'output', 'dir'].includes(arg.name.toLowerCase()) || arg.flags.some(f => ['-o', '--output'].includes(f));
+                    
+                    if (isFileOrDir) {
+                        html += `<div class="input-group">
+                            <input type="text" id="${id}" placeholder="Caminho do arquivo ou diretório..." data-flag="${arg.flags[0] || ''}" data-is-pos="${arg.flags.length === 0}">
+                            <button type="button" class="btn-secondary" onclick="openFsModal('${id}')">Buscar</button>
+                        </div>`;
+                    } else {
+                        html += `<input type="text" id="${id}" placeholder="Valor..." data-flag="${arg.flags[0] || ''}" data-is-pos="${arg.flags.length === 0}">`;
+                    }
                 }
                 html += `</div>`;
             });
             document.getElementById('dynamic-form').innerHTML = html;
+        }
+
+        // --- File System Browser ---
+        async function loadFs(path = "") {
+            const res = await fetch('/fs?path=' + encodeURIComponent(path));
+            const data = await res.json();
+            if (data.error) {
+                alert(data.error);
+                return;
+            }
+            fsCurrentPath = data.current;
+            document.getElementById('fs-current-path').value = fsCurrentPath;
+            
+            let listHtml = "";
+            data.dirs.forEach(d => {
+                listHtml += `<div class="fs-item fs-dir" onclick="loadFs('${fsCurrentPath}/${d}')">📁 ${d}</div>`;
+            });
+            data.files.forEach(f => {
+                listHtml += `<div class="fs-item" onclick="fsSelectFile('${fsCurrentPath}/${f}')">📄 ${f}</div>`;
+            });
+            document.getElementById('fs-list').innerHTML = listHtml;
+        }
+
+        function openFsModal(inputId) {
+            fsTargetInput = inputId;
+            document.getElementById('fs-modal').classList.remove('hidden');
+            loadFs(document.getElementById(inputId).value || ".");
+        }
+
+        function closeFsModal() {
+            document.getElementById('fs-modal').classList.add('hidden');
+        }
+
+        function fsGoUp() {
+            loadFs(fsCurrentPath + "/..");
+        }
+
+        function fsSelectFile(fullPath) {
+            document.getElementById(fsTargetInput).value = fullPath;
+            closeFsModal();
+        }
+
+        function fsSelectCurrent() {
+            document.getElementById(fsTargetInput).value = fsCurrentPath;
+            closeFsModal();
         }
 
         async function runScript() {
@@ -200,6 +289,24 @@ def index():
     scripts = [f for f in os.listdir('.') if f.endswith('.py') and f != os.path.basename(__file__)]
     scripts.sort()
     return render_template_string(HTML_TEMPLATE, scripts=scripts)
+
+@app.route('/fs')
+def file_system():
+    req_path = request.args.get('path', '.')
+    if not req_path.strip():
+        req_path = '.'
+    try:
+        abs_path = os.path.abspath(req_path)
+        if not os.path.exists(abs_path):
+            abs_path = os.path.abspath('.')
+        items = os.listdir(abs_path)
+        dirs = [d for d in items if os.path.isdir(os.path.join(abs_path, d))]
+        files = [f for f in items if os.path.isfile(os.path.join(abs_path, f))]
+        dirs.sort()
+        files.sort()
+        return jsonify({"current": abs_path, "dirs": dirs, "files": files})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route('/schema')
 def get_schema():
