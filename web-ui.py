@@ -161,7 +161,7 @@ HTML_TEMPLATE = """
             document.getElementById('dynamic-form').innerHTML = "";
             document.getElementById('run-btn').classList.add('hidden');
             
-            outputBox.innerText = "Instalando dependências (pip install -r requirements.txt)...\nIsso pode demorar um pouco...";
+            outputBox.innerText = "Instalando dependências (pip install -r requirements.txt)...\\nIsso pode demorar um pouco...";
             
             try {
                 const res = await fetch('/install', { method: 'POST' });
