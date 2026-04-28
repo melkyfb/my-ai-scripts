@@ -4,3 +4,4 @@ openai
 anthropic
 yt-dlp
 litellm[proxy]
+flask
