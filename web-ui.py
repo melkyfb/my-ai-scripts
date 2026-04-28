@@ -6,12 +6,23 @@ Requires: pip install flask
 """
 
 import os
+import sys
 import ast
 import shlex
 import subprocess
 from flask import Flask, render_template_string, request, jsonify
 
 app = Flask(__name__)
+
+def get_python_cmd():
+    """Retorna o caminho do python dentro do venv se existir, senão usa o atual."""
+    if os.path.exists('venv/bin/python'):
+        return 'venv/bin/python'
+    elif os.path.exists('venv/Scripts/python.exe'):
+        return 'venv/Scripts/python.exe'
+    return sys.executable
+
+PYTHON_CMD = get_python_cmd()
 
 def extract_script_args(filepath):
     """Lê o script e extrai os argumentos do argparse usando AST."""
@@ -107,7 +118,8 @@ HTML_TEMPLATE = """
     </div>
 
     <div id="sidebar">
-        <h2>Meus Scripts</h2>
+        <h2><a href="https://github.com/melkyfb/my-ai-scripts" target="_blank" style="color: white; text-decoration: none;" title="Abrir repositório no GitHub">Meus Scripts 🔗</a></h2>
+        <div class="tab" onclick="installDeps()" style="background: #28a745; font-weight: bold; text-align: center; font-size: 0.9em; padding: 10px; margin: 10px; border-radius: 4px;">📦 Instalar Dependências</div>
         {% for script in scripts %}
             <div class="tab" onclick="selectScript('{{ script }}')" id="tab-{{ script|replace('.', '-') }}">{{ script }}</div>
         {% endfor %}
@@ -138,6 +150,28 @@ HTML_TEMPLATE = """
         let fsTargetInput = null;
         let fsCurrentPath = "";
 
+        async function installDeps() {
+            const outputBox = document.getElementById('script-output');
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            
+            document.getElementById('script-ui').classList.remove('hidden');
+            document.getElementById('script-title').innerText = "Instalação de Dependências";
+            document.getElementById('help-btn').classList.add('hidden');
+            document.getElementById('script-help').classList.add('hidden');
+            document.getElementById('dynamic-form').innerHTML = "";
+            document.getElementById('run-btn').classList.add('hidden');
+            
+            outputBox.innerText = "Instalando dependências (pip install -r requirements.txt)...\nIsso pode demorar um pouco...";
+            
+            try {
+                const res = await fetch('/install', { method: 'POST' });
+                const data = await res.json();
+                outputBox.innerText = data.output;
+            } catch (err) {
+                outputBox.innerText = "Erro ao instalar: " + err;
+            }
+        }
+
         function toggleHelp() {
             document.getElementById('script-help').classList.toggle('hidden');
         }
@@ -150,6 +184,7 @@ HTML_TEMPLATE = """
             document.getElementById('script-title').innerText = script;
             document.getElementById('help-btn').classList.remove('hidden');
             document.getElementById('script-ui').classList.remove('hidden');
+            document.getElementById('run-btn').classList.remove('hidden');
             document.getElementById('script-help').classList.add('hidden');
             document.getElementById('script-help').innerText = "Carregando opções...";
             document.getElementById('script-output').innerText = "Aguardando execução...";
@@ -261,7 +296,7 @@ HTML_TEMPLATE = """
 
             btn.disabled = true;
             btn.innerText = "Executando...";
-            outputBox.innerText = "Rodando: python3 " + currentScript + " " + argsStr + "\\n\\n...";
+            outputBox.innerText = "Rodando: venv python " + currentScript + " " + argsStr + "\\n\\n...";
 
             try {
                 const formData = new FormData();
@@ -315,7 +350,7 @@ def get_schema():
         return jsonify({"help": "Script não encontrado.", "args": []})
     
     try:
-        res = subprocess.run(['python3', script, '--help'], capture_output=True, text=True, timeout=5)
+        res = subprocess.run([PYTHON_CMD, script, '--help'], capture_output=True, text=True, timeout=5)
         help_text = res.stdout or res.stderr
         
         args_schema = extract_script_args(script)
@@ -331,7 +366,7 @@ def run_script():
     if not script or not os.path.exists(script):
         return jsonify({"output": "Script inválido."})
 
-    cmd = ['python3', script]
+    cmd = [PYTHON_CMD, script]
     if args_str:
         cmd.extend(shlex.split(args_str))
 
@@ -347,6 +382,18 @@ def run_script():
         return jsonify({"output": out})
     except Exception as e:
         return jsonify({"output": f"Falha na execução: {str(e)}"})
+
+@app.route('/install', methods=['POST'])
+def install_deps():
+    try:
+        pip_cmd = [PYTHON_CMD, '-m', 'pip', 'install', '-r', 'requirements.txt']
+        res = subprocess.run(pip_cmd, capture_output=True, text=True)
+        out = res.stdout
+        if res.stderr:
+            out += "\n--- ERROS / AVISOS ---\n" + res.stderr
+        return jsonify({"output": out})
+    except Exception as e:
+        return jsonify({"output": f"Falha na instalação: {str(e)}"})
 
 if __name__ == '__main__':
     print("Iniciando interface web...")
