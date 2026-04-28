@@ -380,18 +380,22 @@ def run(url: str, output_dir: str):
             print("\nCancelled.")
             sys.exit(0)
 
+        safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip() or "Playlist"
+        pl_dir = str(Path(output_dir) / safe_title)
+        os.makedirs(pl_dir, exist_ok=True)
+
         if pl_action == "best_video":
-            opts = base_opts(output_dir)
-            opts["outtmpl"]             = str(Path(output_dir) / "%(playlist_index)s - %(title)s.%(ext)s")
+            opts = base_opts(pl_dir)
+            opts["outtmpl"]             = str(Path(pl_dir) / "%(playlist_index)s - %(title)s.%(ext)s")
             opts["format"]              = "bestvideo+bestaudio/best"
             opts["merge_output_format"] = "mp4"
         else:
-            opts = menu_audio(info.get("formats") or [], output_dir)
-            opts["outtmpl"] = str(Path(output_dir) / "%(playlist_index)s - %(title)s.%(ext)s")
+            opts = menu_audio(info.get("formats") or [], pl_dir)
+            opts["outtmpl"] = str(Path(pl_dir) / "%(playlist_index)s - %(title)s.%(ext)s")
 
-        print(f"\nDownloading {len(entries)} items → {output_dir}")
+        print(f"\nDownloading {len(entries)} items → {pl_dir}")
         do_download(url, opts)
-        print(f"\nDone! Saved to: {output_dir}\n")
+        print(f"\nDone! Saved to: {pl_dir}\n")
         return
 
     # ── single content ────────────────────────────────────────────────────────
