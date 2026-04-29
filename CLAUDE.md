@@ -74,11 +74,27 @@ python download.py <url> [-o output_dir]
 - Supports: YouTube, Instagram, TikTok, Facebook, Vimeo, Twitter/X, Twitch, Reddit, SoundCloud, Dailymotion, Rumble, and hundreds more via yt-dlp
 - Analyzes the URL first (no download) to detect available formats and content type
 - Interactive menu adapts to content: audio-focused sites (SoundCloud, YouTube Music) show audio options first
-- Playlist support: detects playlists and offers bulk download
+- Playlist support: detects playlists and offers bulk download; saves to a subfolder named after the playlist title
 - Image support: detects photo posts (Instagram) and offers image download
 - Video quality menu: shows all available resolutions with codec, container and estimated size
 - Audio options: MP3 192/320kbps, M4A, Opus, WAV, or keep original codec
 - Progress bar with speed and ETA during download
+
+### `web-ui.py`
+Requires: `pip install flask`
+
+```
+python web-ui.py
+```
+
+- Launches a local web interface (Flask) to run any Python script in the folder from a browser
+- Sidebar lists all `.py` scripts; clicking one shows a dynamic form with its arguments
+- Arguments are extracted from each script's `argparse` definitions via AST (no imports needed)
+- Supports text inputs, checkboxes (for `store_true` flags), and dropdowns (for `choices`)
+- Output is streamed into a terminal-style panel in real time
+- Detects venv automatically and runs scripts with the correct Python interpreter
+- Offers a one-click dependency installer (`pip install -r requirements.txt`) from the UI
+- Help icon (`?`) next to each argument shows its `help` string in a tooltip
 
 ### `claude-local.py`
 Requires: `pip install 'litellm[proxy]'` + Ollama running locally
