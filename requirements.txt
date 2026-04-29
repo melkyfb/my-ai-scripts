@@ -5,3 +5,5 @@ anthropic
 yt-dlp
 litellm[proxy]
 flask
+requests
+beautifulsoup4

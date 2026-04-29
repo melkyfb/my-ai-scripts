@@ -112,6 +112,18 @@ python claude-local.py [-m MODEL] [-c TOKENS] [--port PORT]
   works regardless of which default model Claude Code is configured to use
 - Proxy shuts down automatically when Claude Code exits
 
+### `scribd-download.py`
+Requires: `pip install requests beautifulsoup4`
+
+```
+python scribd-download.py <url> [-o output_dir]
+```
+
+- `url` — Scribd document URL
+- `-o` / `--output` — Output directory (default: current directory)
+- Interactively extracts document info (title, ID) and prompts the user before downloading
+- Currently implements the full interaction structure with a placeholder for the actual DRM-busting download logic
+
 ## Planned scripts
 
 - **Image generation** — generate images from a terminal prompt (via API, e.g. OpenAI/Stability)

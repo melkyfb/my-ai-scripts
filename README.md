@@ -291,6 +291,36 @@ The proxy maps the user-specified Ollama model to all Claude model aliases that 
 
 ---
 
+### `scribd-download.py`
+
+Download documents from Scribd.com.
+
+**Requires:** `pip install requests beautifulsoup4`
+
+```bash
+python scribd-download.py <url> [-o DIR]
+```
+
+| Argument | Description |
+|---|---|
+| `url` | URL of the Scribd document |
+| `-o, --output` | Output directory (default: current directory) |
+
+**What it does:**
+
+1. Analyzes the Scribd URL to extract the document title and ID.
+2. Presents an interactive menu to download, change the output directory, or cancel.
+3. *Note:* Currently implements the full interaction structure with a placeholder for the actual DRM-busting download logic.
+
+**Examples:**
+
+```bash
+# Download a document
+python scribd-download.py https://www.scribd.com/document/123456789/Example
+```
+
+---
+
 ## Planned
 
 - **Image generation** — generate images from a terminal prompt via API (OpenAI/Stability)
