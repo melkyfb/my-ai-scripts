@@ -107,11 +107,14 @@ def main():
         print("Erro: A URL fornecida não parece ser do Scribd.", file=sys.stderr)
         sys.exit(1)
 
+    # O scribd-dl exige que a URL comece com www.scribd.com (remover subdomínios como pt.)
+    url = re.sub(r'https?://[^/]*scribd\.com', 'https://www.scribd.com', args.url)
+
     out = str(Path(args.output).expanduser().resolve())
     os.makedirs(out, exist_ok=True)
 
     print("\nAnalisando URL...")
-    info = get_document_info(args.url)
+    info = get_document_info(url)
     
     print(f"\n  Título : {info['title']}")
     print(f"  ID Doc : {info['doc_id']}")
