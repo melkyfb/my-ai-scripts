@@ -4,6 +4,7 @@ scribd-download.py — Baixar documentos do Scribd.
 
 Requer:
   pip install requests beautifulsoup4
+  Sistema: node, npm, git (para o motor de download)
 
 Uso:
   python scribd-download.py <url> [-o output_dir]
@@ -48,22 +49,47 @@ def get_document_info(url: str) -> dict:
 
 
 def download_document(info: dict, output_dir: str):
-    safe_title = "".join(c for c in info['title'] if c not in r'\/:*?"<>|').strip() or "Scribd_Doc"
-    filename = f"{safe_title}_{info['doc_id']}.pdf"
-    out_path = Path(output_dir) / filename
+    import shutil
+    import subprocess
     
+    if not shutil.which("node") or not shutil.which("npm"):
+        print("Erro: node.js e npm são necessários para o motor de download.", file=sys.stderr)
+        print("Instale o Node.js: https://nodejs.org/", file=sys.stderr)
+        return
+
+    if not shutil.which("git"):
+        print("Erro: git é necessário para baixar a ferramenta base.", file=sys.stderr)
+        return
+
+    tool_dir = Path.home() / ".scribd-dl"
+    if not tool_dir.exists():
+        print("\nPrimeira execução: instalando o motor rkwyu/scribd-dl...")
+        subprocess.run(["git", "clone", "https://github.com/rkwyu/scribd-dl.git", str(tool_dir)])
+        print("\nInstalando dependências do scribd-dl (isso pode demorar um pouco)...")
+        subprocess.run(["npm", "install"], cwd=tool_dir)
+
     print(f"\nBaixando '{info['title']}'...")
-    print("  (Nota: O Scribd possui DRM ativo. Esta é uma implementação estrutural para demonstração.")
-    print("   A lógica de scraping de imagens ou uso de API de terceiros deve ser inserida aqui.)")
     
-    # Simulação do processo de download
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(f"Documento Scribd: {info['title']}\n")
-        f.write(f"ID: {info['doc_id']}\n")
-        f.write(f"URL: {info['url']}\n")
+    # Configurar o scribd-dl para salvar no diretório escolhido via config.ini
+    config_path = tool_dir / "config.ini"
+    config_content = f"""[SCRIBD]
+rendertime=100
+
+[SLIDESHARE]
+rendertime=100
+
+[DIRECTORY]
+output={Path(output_dir).absolute()}
+filename=title
+"""
+    config_path.write_text(config_content, encoding="utf-8")
+    
+    Path(output_dir).mkdir(parents=True, exist_ok=True)
+    
+    cmd = ["npm", "start", info['url']]
+    subprocess.run(cmd, cwd=tool_dir)
         
-    print(f"\nConcluído! Salvo em: {out_path}\n")
+    print(f"\nConcluído! Verifique o diretório: {output_dir}\n")
 
 
 def main():
