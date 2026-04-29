@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
 
 try:
     import yt_dlp
@@ -20,6 +20,8 @@ try:
 except ImportError:
     print("Error: yt-dlp is not installed.\nRun: pip install yt-dlp")
     sys.exit(1)
+
+from prompt_ui import choice as choose
 
 
 SITE_MAP = {
@@ -54,6 +56,23 @@ def site_name(url: str) -> str:
     return host or "Unknown"
 
 
+def strip_playlist_param(url: str) -> str:
+    """Remove list= and index= from URL to target a single video."""
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    params.pop("list", None)
+    params.pop("index", None)
+    new_query = urlencode({k: v[0] for k, v in params.items()})
+    return urlunparse(parsed._replace(query=new_query))
+
+
+def is_mixed_playlist_url(url: str) -> bool:
+    """True when URL points to a specific video that is also part of a playlist."""
+    parsed = urlparse(url)
+    params = parse_qs(parsed.query)
+    return "v" in params and "list" in params
+
+
 def is_audio_site(url: str) -> bool:
     host = urlparse(url).hostname or ""
     host = host.lower().removeprefix("www.")
@@ -76,31 +95,6 @@ def fmt_dur(secs) -> str:
     h, rem = divmod(int(secs), 3600)
     m, s = divmod(rem, 60)
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
-
-
-def choose(prompt: str, options: list, allow_back: bool = False) -> int:
-    """Numbered menu — returns 0-based index, or -1 for back."""
-    print()
-    for i, opt in enumerate(options, 1):
-        print(f"  {i}. {opt}")
-    if allow_back:
-        print("  0. Back")
-    print()
-    while True:
-        try:
-            raw = input(f"  {prompt}: ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nCancelled.")
-            sys.exit(0)
-        if allow_back and raw == "0":
-            return -1
-        try:
-            val = int(raw)
-            if 1 <= val <= len(options):
-                return val - 1
-        except ValueError:
-            pass
-        print(f"  Please enter a number between 1 and {len(options)}.")
 
 
 # ── format analysis ───────────────────────────────────────────────────────────
@@ -368,9 +362,12 @@ def run(url: str, output_dir: str):
         entries = [e for e in (info.get("entries") or []) if e]
         print(f"  Items   : {len(entries)}")
 
-        pl_options = [
-            ("best_video", f"Download all  ({len(entries)} items) — best quality video"),
-            ("audio_only", f"Download all  ({len(entries)} items) — audio only"),
+        pl_options = []
+        if is_mixed_playlist_url(url):
+            pl_options.append(("single_video", "Download just this video"))
+        pl_options += [
+            ("best_video", f"Download full playlist  ({len(entries)} items) — best quality video"),
+            ("audio_only", f"Download full playlist  ({len(entries)} items) — audio only"),
             ("cancel",     "Cancel"),
         ]
         pl_idx    = choose("Playlist options", [l for _, l in pl_options])
@@ -379,6 +376,10 @@ def run(url: str, output_dir: str):
         if pl_action == "cancel":
             print("\nCancelled.")
             sys.exit(0)
+
+        if pl_action == "single_video":
+            run(strip_playlist_param(url), output_dir)
+            return
 
         safe_title = "".join(c for c in title if c not in r'\/:*?"<>|').strip() or "Playlist"
         pl_dir = str(Path(output_dir) / safe_title)

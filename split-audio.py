@@ -10,6 +10,10 @@ Usage:
   python split-audio.py lecture.mp3 --mode time --interval 1:00:00 --split-at sentence
   python split-audio.py audiobook.mp3 --mode chapters
   python split-audio.py interview.mp4 --mode time --interval 45:00 --split-at exact -o ./parts
+
+Interactive prompts are routed through prompt_ui:
+  - When run via web-ui.py, menus are rendered as clickable buttons.
+  - When run directly from a terminal, menus are rendered as numbered prompts.
 """
 
 import argparse
@@ -19,6 +23,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
+
+from prompt_ui import choice, confirm
 
 
 # ─── Time helpers ─────────────────────────────────────────────────────────────
@@ -279,33 +285,25 @@ def choose_silence_level(levels, silences, duration, min_chapter):
 
     # Multiple levels: display and ask
     LABELS = ["chapter-level (longest silences)", "section-level", "sub-section-level"]
-    print("\n  Detected structural levels:\n")
     auto = None
+    options = []
     for i, (lv, bounds) in enumerate(zip(levels, all_bounds)):
         n = len(bounds) - 1
         label = LABELS[i] if i < len(LABELS) else f"level {i + 1}"
-        marker = ""
-        if auto is None and SANE_RANGE[0] <= n <= SANE_RANGE[1]:
+        is_auto = auto is None and SANE_RANGE[0] <= n <= SANE_RANGE[1]
+        if is_auto:
             auto = i
-            marker = "  ← recommended"
-        print(f"    {i + 1}. {label:<38} {n:3d} parts  "
-              f"(silence ≥ {lv['threshold']:.1f}s, avg {lv['avg_dur']:.1f}s){marker}")
+        marker = "  ← recommended" if is_auto else ""
+        options.append(
+            f"{label}  —  {n} parts  "
+            f"(silence ≥ {lv['threshold']:.1f}s, avg {lv['avg_dur']:.1f}s){marker}"
+        )
 
     if auto is None:
         auto = 0  # fallback to coarsest level
 
-    print()
-    while True:
-        raw = input(f"  Choose level [1–{len(levels)}] or Enter for recommended ({auto + 1}): ").strip()
-        if raw == "":
-            return all_bounds[auto]
-        try:
-            v = int(raw) - 1
-            if 0 <= v < len(levels):
-                return all_bounds[v]
-        except ValueError:
-            pass
-        print(f"  Please enter a number between 1 and {len(levels)}.")
+    idx = choice("Choose structural level", options)
+    return all_bounds[idx]
 
 
 def build_chapter_boundaries(file_path, duration, args):
@@ -617,15 +615,6 @@ def preview(boundaries, stem, suffix, name_fmt, titles=None):
     print(f"  Total: {total} segment(s)\n")
 
 
-def confirm(prompt="Proceed with splitting? [y/n]: "):
-    while True:
-        answer = input(prompt).strip().lower()
-        if answer in ("y", "yes"):
-            return True
-        if answer in ("n", "no"):
-            return False
-
-
 # ─── Splitting ────────────────────────────────────────────────────────────────
 
 def split_file(file_path, boundaries, output_dir, stem, name_fmt, titles=None):
@@ -819,7 +808,7 @@ examples:
 
     preview(boundaries, stem, file_path.suffix, args.name, titles=titles)
 
-    if not args.yes and not confirm():
+    if not args.yes and not confirm("Proceed with splitting?", default=True):
         print("Cancelled.")
         sys.exit(0)
 

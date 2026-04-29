@@ -11,12 +11,18 @@ Usage:
            "31"      single image 31 pages; or N images cycled 31 times
            "2,2"     first image x2, second image x2
            "3,1,2"   per-image counts; if count < images, cycles the pattern
+
+Interactive prompts are routed through prompt_ui:
+  - When run via web-ui.py, menus are rendered as clickable buttons.
+  - When run directly from a terminal, menus are rendered as numbered prompts.
 """
 
 import argparse
 import sys
 from pathlib import Path
 from PIL import Image
+
+from prompt_ui import choice, text
 
 SUPPORTED = {".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".tif", ".webp"}
 MAX_PREVIEW = 12
@@ -155,7 +161,7 @@ def main() -> None:
         reps = parse_reps(rep_str)
         if reps is None:
             print(f"\n  Invalid: '{rep_str}'. Use positive comma-separated integers (e.g. 3 or 2,2,1).")
-            rep_str = input("  Repetitions: ").strip()
+            rep_str = text("Repetitions:", placeholder="3 or 2,2,1")
             continue
 
         pages, desc = build_pages(images, reps)
@@ -168,23 +174,30 @@ def main() -> None:
         if len(reps) not in (1, len(images)):
             print("\n  (cyclic pattern applied — please confirm this is what you intended)")
 
-        answer = input("\n  [Y] Confirm  [r] Change repetitions  [o] Change output  [q] Quit\n  > ").strip().lower()
+        action = choice(
+            "What now?",
+            [
+                "Confirm and create PDF",
+                "Change repetitions",
+                "Change output path",
+                "Quit",
+            ],
+        )
 
-        if answer in ("", "y", "yes"):
+        if action == 0:
             create_pdf(pages, output)
             break
-        elif answer == "r":
-            rep_str = input("  New repetitions: ").strip()
-        elif answer == "o":
-            new_out = input("  New output path: ").strip()
-            output = Path(new_out)
-            if output.suffix.lower() != ".pdf":
-                output = output.with_suffix(".pdf")
-        elif answer in ("q", "quit", "exit"):
+        elif action == 1:
+            rep_str = text("New repetitions:", default=rep_str, placeholder="e.g. 3 or 2,2,1")
+        elif action == 2:
+            new_out = text("New output path:", default=str(output))
+            if new_out:
+                output = Path(new_out)
+                if output.suffix.lower() != ".pdf":
+                    output = output.with_suffix(".pdf")
+        elif action == 3:
             print("Aborted.")
             sys.exit(0)
-        else:
-            print("  Please enter Y, r, o, or q.")
 
 
 if __name__ == "__main__":
