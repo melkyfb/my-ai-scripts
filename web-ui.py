@@ -840,7 +840,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     function isFileLike(arg) {
         const nameLower = arg.name.toLowerCase();
         const flagsLower = arg.flags.map(f => f.toLowerCase());
-        return ['file', 'path', 'dir', 'output'].some(k => nameLower.includes(k))
+        return ['file', 'path', 'dir', 'output', 'input'].some(k => nameLower.includes(k))
             || flagsLower.some(f => ['-o', '--output', '--dir', '--file'].includes(f));
     }
 
