@@ -844,6 +844,51 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             || flagsLower.some(f => ['-o', '--output', '--dir', '--file'].includes(f));
     }
 
+    function isOutputLike(arg) {
+        const nameLower = arg.name.toLowerCase();
+        const flagsLower = (arg.flags || []).map(f => f.toLowerCase());
+        return nameLower === 'output'
+            || flagsLower.includes('-o')
+            || flagsLower.includes('--output');
+    }
+
+    function triggerUpload(inputId, isDir) {
+        const el = document.getElementById((isDir ? 'uf-dir-' : 'uf-file-') + inputId);
+        if (el) el.click();
+    }
+
+    async function handleUpload(inputId, isDir) {
+        const el = document.getElementById((isDir ? 'uf-dir-' : 'uf-file-') + inputId);
+        if (!el || !el.files.length) return;
+
+        const fd = new FormData();
+        for (const f of el.files) {
+            fd.append('files', f, f.webkitRelativePath || f.name);
+        }
+
+        const textInput = document.getElementById(inputId);
+        const prev = textInput.value;
+        textInput.value = 'Enviando...';
+        textInput.disabled = true;
+
+        try {
+            const res = await fetch('/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.error) {
+                alert('Erro no upload: ' + data.error);
+                textInput.value = prev;
+            } else {
+                textInput.value = data.path;
+            }
+        } catch (e) {
+            alert('Erro de rede: ' + e);
+            textInput.value = prev;
+        } finally {
+            textInput.disabled = false;
+            el.value = '';
+        }
+    }
+
     function buildForm(args) {
         const grid = document.getElementById('args-grid');
         if (!args.length) {
@@ -887,9 +932,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </select>`;
                 } else if (isFile) {
                     const ph = arg.default || (isPos ? `Caminho para ${arg.name}...` : 'Caminho...');
+                    const isOut = isOutputLike(arg);
+                    const uploadBtns = isOut ? '' : `
+                        <button class="btn btn-ghost btn-sm" type="button" onclick="triggerUpload('${id}', false)" title="Enviar arquivo">⬆ arq</button>
+                        <button class="btn btn-ghost btn-sm" type="button" onclick="triggerUpload('${id}', true)" title="Enviar pasta">📂 pasta</button>
+                        <input type="file" id="uf-file-${id}" style="display:none" onchange="handleUpload('${id}', false)">
+                        <input type="file" id="uf-dir-${id}" style="display:none" webkitdirectory multiple onchange="handleUpload('${id}', true)">`;
                     html += `<div class="input-row">
                         <input type="text" id="${id}" placeholder="${ph}" data-flag="${arg.flags[0] || ''}" data-pos="${isPos}">
                         <button class="btn btn-ghost btn-sm" type="button" onclick="openFsModal('${id}')">📁</button>
+                        ${uploadBtns}
                     </div>`;
                 } else {
                     const ph = arg.default ? `Padrão: ${arg.default}` : 'Valor...';
