@@ -149,6 +149,13 @@ def main() -> None:
     if output.suffix.lower() != ".pdf":
         output = output.with_suffix(".pdf")
 
+    if args.output is None:
+        new_out = text("Output path:", default=str(output))
+        if new_out:
+            output = Path(new_out)
+            if output.suffix.lower() != ".pdf":
+                output = output.with_suffix(".pdf")
+
     images = find_images(path)
 
     print(f"\nFound {len(images)} image(s):")

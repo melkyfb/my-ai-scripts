@@ -844,6 +844,51 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             || flagsLower.some(f => ['-o', '--output', '--dir', '--file'].includes(f));
     }
 
+    function isOutputLike(arg) {
+        const nameLower = arg.name.toLowerCase();
+        const flagsLower = (arg.flags || []).map(f => f.toLowerCase());
+        return nameLower === 'output'
+            || flagsLower.includes('-o')
+            || flagsLower.includes('--output');
+    }
+
+    function triggerUpload(inputId, isDir) {
+        const el = document.getElementById((isDir ? 'uf-dir-' : 'uf-file-') + inputId);
+        if (el) el.click();
+    }
+
+    async function handleUpload(inputId, isDir) {
+        const el = document.getElementById((isDir ? 'uf-dir-' : 'uf-file-') + inputId);
+        if (!el || !el.files.length) return;
+
+        const fd = new FormData();
+        for (const f of el.files) {
+            fd.append('files', f, f.webkitRelativePath || f.name);
+        }
+
+        const textInput = document.getElementById(inputId);
+        const prev = textInput.value;
+        textInput.value = 'Enviando...';
+        textInput.disabled = true;
+
+        try {
+            const res = await fetch('/upload', { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.error) {
+                alert('Erro no upload: ' + data.error);
+                textInput.value = prev;
+            } else {
+                textInput.value = data.path;
+            }
+        } catch (e) {
+            alert('Erro de rede: ' + e);
+            textInput.value = prev;
+        } finally {
+            textInput.disabled = false;
+            el.value = '';
+        }
+    }
+
     function buildForm(args) {
         const grid = document.getElementById('args-grid');
         if (!args.length) {
@@ -887,9 +932,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                     </select>`;
                 } else if (isFile) {
                     const ph = arg.default || (isPos ? `Caminho para ${arg.name}...` : 'Caminho...');
+                    const isOut = isOutputLike(arg);
+                    const uploadBtns = isOut ? '' : `
+                        <button class="btn btn-ghost btn-sm" type="button" onclick="triggerUpload('${id}', false)" title="Enviar arquivo">⬆ arq</button>
+                        <button class="btn btn-ghost btn-sm" type="button" onclick="triggerUpload('${id}', true)" title="Enviar pasta">📂 pasta</button>
+                        <input type="file" id="uf-file-${id}" style="display:none" onchange="handleUpload('${id}', false)">
+                        <input type="file" id="uf-dir-${id}" style="display:none" webkitdirectory multiple onchange="handleUpload('${id}', true)">`;
                     html += `<div class="input-row">
                         <input type="text" id="${id}" placeholder="${ph}" data-flag="${arg.flags[0] || ''}" data-pos="${isPos}">
                         <button class="btn btn-ghost btn-sm" type="button" onclick="openFsModal('${id}')">📁</button>
+                        ${uploadBtns}
                     </div>`;
                 } else {
                     const ph = arg.default ? `Padrão: ${arg.default}` : 'Valor...';
@@ -1600,6 +1652,37 @@ def install_deps():
         return jsonify({'output': out})
     except Exception as e:
         return jsonify({'output': f'Falha: {e}'})
+
+
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    files = request.files.getlist('files')
+    if not files or all(f.filename == '' for f in files):
+        return jsonify({'error': 'Nenhum arquivo enviado.'}), 400
+
+    uid = uuid.uuid4().hex
+    upload_dir = os.path.join('uploads', uid)
+
+    if len(files) == 1:
+        f = files[0]
+        os.makedirs(upload_dir, exist_ok=True)
+        dest = os.path.join(upload_dir, os.path.basename(f.filename))
+        f.save(dest)
+        return jsonify({'path': os.path.abspath(dest)})
+
+    # Multiple files — folder upload (webkitdirectory sends relative paths)
+    os.makedirs(upload_dir, exist_ok=True)
+    top_folder = None
+    for f in files:
+        rel = f.filename.replace('\\', '/')
+        dest = os.path.join(upload_dir, rel)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        f.save(dest)
+        if top_folder is None and '/' in rel:
+            top_folder = rel.split('/')[0]
+
+    folder_path = os.path.join(upload_dir, top_folder) if top_folder else upload_dir
+    return jsonify({'path': os.path.abspath(folder_path)})
 
 
 if __name__ == '__main__':
