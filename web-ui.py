@@ -1602,6 +1602,37 @@ def install_deps():
         return jsonify({'output': f'Falha: {e}'})
 
 
+@app.route('/upload', methods=['POST'])
+def upload_file():
+    files = request.files.getlist('files')
+    if not files or all(f.filename == '' for f in files):
+        return jsonify({'error': 'Nenhum arquivo enviado.'}), 400
+
+    uid = uuid.uuid4().hex
+    upload_dir = os.path.join('uploads', uid)
+
+    if len(files) == 1:
+        f = files[0]
+        os.makedirs(upload_dir, exist_ok=True)
+        dest = os.path.join(upload_dir, os.path.basename(f.filename))
+        f.save(dest)
+        return jsonify({'path': os.path.abspath(dest)})
+
+    # Multiple files — folder upload (webkitdirectory sends relative paths)
+    os.makedirs(upload_dir, exist_ok=True)
+    top_folder = None
+    for f in files:
+        rel = f.filename.replace('\\', '/')
+        dest = os.path.join(upload_dir, rel)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        f.save(dest)
+        if top_folder is None and '/' in rel:
+            top_folder = rel.split('/')[0]
+
+    folder_path = os.path.join(upload_dir, top_folder) if top_folder else upload_dir
+    return jsonify({'path': os.path.abspath(folder_path)})
+
+
 if __name__ == '__main__':
     print('Iniciando interface web...')
     print('Acesse: http://127.0.0.1:5000')
